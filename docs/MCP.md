@@ -6,13 +6,27 @@ ADB Console 把本机 adb 能力以 23 个工具的形式暴露给 MCP 客户端
 
 1. 启动 ADB Console（源码 `python app.py` / `python run.py`，或双击 `ADBConsole.exe`）。
 2. 打开页面，进入「设置 → MCP 服务」，开启开关并确认风险提示。
-3. 在 MCP 客户端中配置 HTTP 地址（端口以启动日志为准，默认 5010）：
+3. 按客户端支持的传输方式连接（端口以启动日志为准，默认 5010）。
 
-- 地址：`http://127.0.0.1:5010/mcp`
-- 传输：HTTP `POST`，JSON-RPC 2.0
-- 支持方法：`initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`
-- 关闭开关后，`/mcp` 返回 HTTP 403；页面右上角显示「MCP 关」
-- 不需要也不建议再单独启动 `mcp_server.py`（仅为只支持 stdio 的客户端保留兼容入口）
+## 传输方式
+
+| 传输 | 入口 | 说明 |
+| --- | --- | --- |
+| Streamable HTTP | `POST /mcp` | JSON-RPC 消息；`Accept: application/json` 返回 JSON，`Accept: text/event-stream` 返回 SSE 事件流 |
+| Streamable HTTP | `GET /mcp` | 带 SSE Accept 时保持独立 SSE 通道（keepalive）；否则返回传输能力说明 JSON |
+| Streamable HTTP | `DELETE /mcp` | 携带 `Mcp-Session-Id` 结束会话 |
+| 旧版 HTTP+SSE | `GET /sse` | 首个 `endpoint` 事件给出 `POST /messages?session_id=...` 地址，后续响应由该 SSE 通道推送 |
+| 旧版 HTTP+SSE | `POST /messages?session_id=...` | 发送 JSON-RPC 消息，返回 202 |
+| stdio | `mcp_server.py` | 仅给只能以 stdio 启动的客户端保留 |
+
+- 协议：JSON-RPC 2.0；支持 `initialize`、`notifications/initialized`、`ping`、`logging/setLevel`、`tools/list`、`tools/call`。
+- `initialize` 响应会返回 `Mcp-Session-Id`；后续请求可携带该头。
+- 关闭开关后所有 MCP 入口返回 HTTP 403，页面右上角显示「MCP 关」。
+- 不需要也不建议再单独启动 `mcp_server.py`。
+
+## 客户端配置
+
+Streamable HTTP（推荐）：
 
 ```json
 {
@@ -23,6 +37,30 @@ ADB Console 把本机 adb 能力以 23 个工具的形式暴露给 MCP 客户端
     }
   }
 }
+```
+
+旧版 HTTP+SSE：
+
+```json
+{
+  "mcpServers": {
+    "adb-console": {
+      "url": "http://127.0.0.1:5010/sse",
+      "timeoutMs": 60000
+    }
+  }
+}
+```
+
+SSE 响应示例：
+
+```bash
+curl -N -X POST http://127.0.0.1:5010/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}}'
+# event: message
+# data: {"jsonrpc":"2.0","id":1,"result":{...}}
 ```
 
 - 工具失败时 `result.isError = true`，文本内容仍是结构化 JSON，不会伪造成功。

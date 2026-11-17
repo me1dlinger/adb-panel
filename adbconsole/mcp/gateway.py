@@ -17,6 +17,17 @@ SUPPORTED_PROTOCOLS = {"2024-11-05", "2025-03-26", "2025-06-18"}
 
 logger = logging.getLogger("adb-console-mcp")
 
+_LOG_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "notice": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL,
+    "alert": logging.CRITICAL,
+    "emergency": logging.CRITICAL,
+}
+
 HTTP_OK = int("200")
 HTTP_ACCEPTED = int("202")
 HTTP_BAD_REQUEST = int("400")
@@ -50,11 +61,20 @@ class McpGateway:
         if method == "initialize":
             return {
                 "protocolVersion": self.pick_protocol(params),
-                "capabilities": {"tools": {"listChanged": False}},
+                "capabilities": {
+                    "tools": {"listChanged": False},
+                    "logging": {},
+                },
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
                 "instructions": INSTRUCTIONS,
             }
         if method == "ping":
+            return {}
+        if method == "logging/setLevel":
+            level = str((params or {}).get("level") or "").lower()
+            if level not in _LOG_LEVELS:
+                raise McpError(-32602, f"无效的日志级别：{level}")
+            logger.setLevel(_LOG_LEVELS[level])
             return {}
         if method == "tools/list":
             tools = mcp_tools.manifest()
@@ -76,10 +96,10 @@ class McpGateway:
     def handle_message(self, message):
         """处理单条消息；通知（无 id）返回 None。"""
         if not isinstance(message, dict):
-            return self._error(None, -32600, "无效的 JSON-RPC 消息。")
+            return self.make_error(None, -32600, "无效的 JSON-RPC 消息。")
         method = message.get("method")
         if not isinstance(method, str):
-            return self._error(message.get("id"), -32600, "缺少 method 字段。")
+            return self.make_error(message.get("id"), -32600, "缺少 method 字段。")
         if "id" not in message:
             logger.info("NOTIFICATION %s", method)
             return None
@@ -90,17 +110,17 @@ class McpGateway:
         try:
             result = self._dispatch(method, params)
         except McpError as exc:
-            return self._error(request_id, exc.code, exc.message)
+            return self.make_error(request_id, exc.code, exc.message)
         except Exception as exc:  # noqa: BLE001 - 网关必须保持可用
             logger.exception("MCP handler error")
-            return self._error(
+            return self.make_error(
                 request_id, -32603, f"内部错误：{type(exc).__name__}: {exc}"
             )
         logger.info("MCP %s id=%s", method, request_id)
         return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
     @staticmethod
-    def _error(request_id, code: int, message: str) -> dict:
+    def make_error(request_id, code: int, message: str) -> dict:
         return {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -123,7 +143,7 @@ class McpGateway:
             if response is None:
                 return HTTP_ACCEPTED, None
             return HTTP_OK, response
-        return HTTP_BAD_REQUEST, self._error(None, -32600, "无效的 JSON-RPC 消息。")
+        return HTTP_BAD_REQUEST, self.make_error(None, -32600, "无效的 JSON-RPC 消息。")
 
 
 gateway = McpGateway()

@@ -66,10 +66,15 @@ adb 路径按以下优先级解析：`config.json`（页面保存）> 环境变�
 MCP 已合并进主程序，不再需要单独启动 `mcp_server.py`：
 
 - 地址：`http://127.0.0.1:<端口>/mcp`
-- 传输：HTTP `POST` + JSON-RPC 2.0
-- 支持：`initialize`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`
-- 开关：页面“设置 → MCP 服务”，默认关闭；关闭时 `/mcp` 返回 403
+- 传输：
+  - **Streamable HTTP**：`POST /mcp`（可返回 JSON 或 SSE 流）、`GET /mcp`（SSE keepalive）、`DELETE /mcp`（结束会话）
+  - **旧版 HTTP+SSE**：`GET /sse` 获取 endpoint，`POST /messages?session_id=...` 发送消息
+  - **stdio**：仅兼容入口 `mcp_server.py`
+- 协议：JSON-RPC 2.0；支持 `initialize`、`notifications/initialized`、`ping`、`logging/setLevel`、`tools/list`、`tools/call`
+- 开关：页面“设置 → MCP 服务”，默认关闭；关闭时所有 MCP 入口返回 403
 - 23 个工具：`adb_status`、`adb_devices`、`adb_connect`、`adb_pair`、`adb_shell`、`adb_install`、`adb_screenshot`、`adb_logcat`、`adb_tap`、`adb_swipe`、`adb_reboot` 等，详见 [docs/MCP.md](docs/MCP.md)。
+
+SSE 示例：`POST /mcp` 携带 `Accept: text/event-stream` 即可获得 `text/event-stream` 响应；旧版客户端连接 `/sse` 即可。`/mcp` 的 `GET` 在带 SSE Accept 时保持 keepalive 通道，否则返回传输能力说明 JSON。
 
 兼容入口：仅给只能以 stdio 启动的客户端保留 `mcp_server.py`（内部复用同一网关），它不是默认启动方式。
 

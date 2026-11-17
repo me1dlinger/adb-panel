@@ -106,7 +106,10 @@ MCP 默认关闭；以下接口和 `/mcp` 一样，在关闭时返回 HTTP 403�
 | POST | `/api/mcp/toggle` | `{"enabled": true, "acknowledge_risk": true}` | 开启 / 关闭 MCP；开启必须带 `acknowledge_risk` |
 | GET | `/api/mcp/tools` | — | MCP 工具清单（含 JSON Schema） |
 | POST | `/api/mcp/tool` | `{"name": "adb_shell", "arguments": {"cmd": "..."}}` | 调用任意 MCP 工具 |
-| POST | `/mcp` | JSON-RPC 2.0 消息 | 进程内 MCP 服务（HTTP 传输） |
-| GET | `/mcp` | — | 浏览器访问时的状态说明 |
+| POST | `/mcp` | JSON-RPC 2.0 消息 | Streamable HTTP：普通请求返回 JSON；`Accept: text/event-stream` 返回 SSE 事件流 |
+| GET | `/mcp` | `Accept: text/event-stream` 可选 | 带 SSE Accept 时打开 keepalive 通道，否则返回传输能力说明 JSON |
+| DELETE | `/mcp` | 请求头 `Mcp-Session-Id` | 结束 Streamable HTTP 会话 |
+| GET | `/sse` | `?protocol=` 可选 | 旧版 HTTP+SSE：首个 `endpoint` 事件给出消息入口地址 |
+| POST | `/messages` | `?session_id=` + JSON-RPC 消息 | 旧版 HTTP+SSE 的消息入口，响应由 `/sse` 推送，返回 202 |
 
 工具能力详见 [MCP.md](MCP.md)。

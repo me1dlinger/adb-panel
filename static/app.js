@@ -53,7 +53,8 @@
       enabled: false,
       endpoint: "/mcp",
       tool_count: 0,
-      warning: ""
+      warning: "",
+      transports: []
     },
     dragDepth: 0
   };
@@ -1195,6 +1196,7 @@
     state.mcp.endpoint = res.endpoint || "/mcp";
     state.mcp.tool_count = res.tool_count || 0;
     state.mcp.warning = res.warning || "";
+    state.mcp.transports = Array.isArray(res.transports) ? res.transports : [];
     renderMcp();
   }
 
@@ -1210,6 +1212,16 @@
     stateNode.textContent = enabled ? "已启用 · " + state.mcp.tool_count + " 个工具" : "已关闭";
     stateNode.className = "tag " + (enabled ? "tag-ok" : "tag-quiet");
     $("#mcp-endpoint").textContent = window.location.origin + state.mcp.endpoint;
+    var transportNames = {
+      "streamable-http": "Streamable HTTP（JSON / SSE）",
+      "http-sse": "HTTP+SSE",
+      "stdio": "stdio"
+    };
+    var transports = state.mcp.transports.length
+      ? state.mcp.transports
+      : ["streamable-http", "http-sse", "stdio"];
+    $("#mcp-transports").textContent =
+      "传输：" + transports.map(function (name) { return transportNames[name] || name; }).join(" · ");
     if (state.mcp.warning) $("#mcp-warning").textContent = state.mcp.warning;
     $("#meta-mcp").textContent = enabled ? "已启用（" + state.mcp.tool_count + " 个工具）" : "未开启";
   }
