@@ -18,6 +18,22 @@
 - **桌面体验**：exe 启动后常驻系统托盘，可在设置中用系统文件对话框选择 `adb.exe`；重复双击不会新建进程或端口，而是直接打开已运行的控制台。
 - **MCP 服务**：与主程序同进程运行，**默认关闭**，开启前有风险二次确认。
 
+## 界面预览
+
+### 概览
+
+![概览](docs/images/overview.png)
+
+### 屏幕与触控
+
+![屏幕与触控](docs/images/screen.png)
+
+### 文件传输与拖拽发送
+
+| 文件页 | 拖拽文件到页面 |
+| --- | --- |
+| ![文件页](docs/images/files.png) | ![拖拽文件](docs/images/drag-drop.png) |
+
 ## 快速开始（源码）
 
 要求：Python 3.12+，本机可用的 adb（Android Platform Tools）。
