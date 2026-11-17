@@ -18,6 +18,12 @@ import webbrowser
 from werkzeug.serving import make_server
 
 import adb_core
+from adbconsole.services.single_instance import (
+    SingleInstance,
+    clear_runtime,
+    read_runtime_url,
+    write_runtime,
+)
 from adbconsole.services.tray import TrayIcon
 from adbconsole.web import create_app, discovery_loop, find_port
 
@@ -46,11 +52,37 @@ def _warn_without_tray(url: str) -> None:
         print(message)
 
 
+def _warn_already_running(url: str) -> None:
+    message = (
+        f"ADB 控制台已在运行：{url}\n\n已为你打开现有控制台页面。"
+        if url
+        else "ADB 控制台已在运行，但暂时无法读取访问地址。\n请从系统托盘菜单打开控制台。"
+    )
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, message, "ADB 控制台", 0x40)
+    except Exception:  # noqa: BLE001 - 非 Windows
+        print(message)
+
+
 def main() -> None:
+    instance = SingleInstance()
+    if not instance.acquire():
+        # 已有实例：只打开现有页面，不再创建服务与端口。
+        url = read_runtime_url()
+        if url and "--no-browser" not in sys.argv:
+            webbrowser.open(url)
+        if not url:
+            _warn_already_running("")
+        print(f"ADB 控制台已在运行：{url or '（地址未就绪）'}")
+        return
+
     app = create_app()
     port = find_port(5010)
     url = f"http://127.0.0.1:{port}"
     server = make_server("127.0.0.1", port, app, threaded=True)
+    write_runtime(port)
 
     threading.Thread(target=discovery_loop, args=(app,), daemon=True).start()
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -75,14 +107,18 @@ def main() -> None:
         if tray._icon is not None:
             tray._icon.stop()
             time.sleep(0.5)
+        clear_runtime()
+        instance.release()
         os._exit(0 if ok else 1)
 
     def quit_app() -> None:
         app.logger.info("正在退出 ADB 控制台")
+        clear_runtime()
         try:
             server.shutdown()
         except Exception:  # noqa: BLE001
             pass
+        instance.release()
         os._exit(0)
 
     if "--no-tray" in sys.argv:
