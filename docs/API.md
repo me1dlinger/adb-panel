@@ -98,18 +98,19 @@ Base URL：`http://127.0.0.1:<port>`（默认 5010，被占用时自动顺延到
 
 ## MCP 对齐接口
 
-MCP 默认关闭；以下接口和 `/mcp` 一样，在关闭时返回 HTTP 403（`/api/mcp/status` 除外）。
+MCP 默认关闭；以下接口和 `/mcp` 一样，在关闭时返回 HTTP 403（`/api/mcp/status` 除外）。开启后，MCP 入口需要携带访问令牌（默认 `Authorization: Bearer <token>`），未授权返回 401；`/api/mcp/status`、`/api/mcp/toggle`、`/api/mcp/auth` 供本地页面使用，不校验令牌。
 
 | 方法 | 路径 | 参数 | 说明 |
 | --- | --- | --- | --- |
-| GET | `/api/mcp/status` | — | MCP 开关状态、工具数量、地址与风险提示 |
-| POST | `/api/mcp/toggle` | `{"enabled": true, "acknowledge_risk": true}` | 开启 / 关闭 MCP；开启必须带 `acknowledge_risk` |
-| GET | `/api/mcp/tools` | — | MCP 工具清单（含 JSON Schema） |
-| POST | `/api/mcp/tool` | `{"name": "adb_shell", "arguments": {"cmd": "..."}}` | 调用任意 MCP 工具 |
-| POST | `/mcp` | JSON-RPC 2.0 消息 | Streamable HTTP：普通请求返回 JSON；`Accept: text/event-stream` 返回 SSE 事件流 |
-| GET | `/mcp` | `Accept: text/event-stream` 可选 | 带 SSE Accept 时打开 keepalive 通道，否则返回传输能力说明 JSON |
-| DELETE | `/mcp` | 请求头 `Mcp-Session-Id` | 结束 Streamable HTTP 会话 |
-| GET | `/sse` | `?protocol=` 可选 | 旧版 HTTP+SSE：首个 `endpoint` 事件给出消息入口地址 |
-| POST | `/messages` | `?session_id=` + JSON-RPC 消息 | 旧版 HTTP+SSE 的消息入口，响应由 `/sse` 推送，返回 202 |
+| GET | `/api/mcp/status` | — | MCP 开关、工具数量、传输方式、鉴权信息与风险提示 |
+| POST | `/api/mcp/toggle` | `{"enabled": true, "acknowledge_risk": true}` | 开启 / 关闭 MCP；开启自动生成令牌 |
+| POST | `/api/mcp/auth` | `{"header": "Authorization"}` 或 `{"regenerate": true}` | 修改鉴权头名称或重新生成令牌 |
+| GET | `/api/mcp/tools` | 请求头令牌 | MCP 工具清单（含 JSON Schema） |
+| POST | `/api/mcp/tool` | 请求头令牌 + `{"name": "adb_shell", "arguments": {"cmd": "..."}}` | 调用任意 MCP 工具 |
+| POST | `/mcp` | 请求头令牌 + JSON-RPC 2.0 消息 | Streamable HTTP：普通请求返回 JSON；`Accept: text/event-stream` 返回 SSE 事件流 |
+| GET | `/mcp` | 请求头令牌 + `Accept: text/event-stream` | 带 SSE Accept 时打开 keepalive 通道，否则返回传输能力说明 JSON |
+| DELETE | `/mcp` | 请求头令牌 + `Mcp-Session-Id` | 结束 Streamable HTTP 会话 |
+| GET | `/sse` | 请求头令牌 + `?protocol=` 可选 | 旧版 HTTP+SSE：首个 `endpoint` 事件给出消息入口地址 |
+| POST | `/messages` | `?session_id=`（或请求头令牌）+ JSON-RPC 消息 | 旧版 HTTP+SSE 的消息入口，响应由 `/sse` 推送，返回 202 |
 
 工具能力详见 [MCP.md](MCP.md)。

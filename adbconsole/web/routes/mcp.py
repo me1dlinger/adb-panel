@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import queue
 import time
@@ -56,6 +57,81 @@ def _disabled_response():
 def _sse_message(message) -> str:
     data = json.dumps(message, ensure_ascii=False, separators=(",", ":"))
     return f"event: message\ndata: {data}\n\n"
+
+
+def _authorized() -> bool:
+    """校验请求头中的 MCP 令牌；未配置令牌时放行。"""
+    token = app_config.mcp_auth_token()
+    if not token:
+        return True
+
+    header_name = app_config.mcp_auth_header()
+    candidates = []
+    for name in (header_name, "Authorization", "X-MCP-Token"):
+        value = request.headers.get(name)
+        if value:
+            candidates.append(value.strip())
+
+    for value in candidates:
+        if hmac.compare_digest(value, token):
+            return True
+        scheme, _, remainder = value.partition(" ")
+        if scheme.lower() in {"bearer", "token"} and hmac.compare_digest(
+            remainder.strip(), token
+        ):
+            return True
+    return False
+
+
+def _unauthorized_response():
+    response = jsonify(
+        {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {
+                "code": -32001,
+                "message": "未授权：请在请求头携带 MCP 访问令牌（默认 Authorization: Bearer <token>）。",
+            },
+        }
+    )
+    response.status_code = int("401")
+    response.headers["WWW-Authenticate"] = 'Bearer realm="adb-console-mcp"'
+    return response
+
+
+def _parity_unauthorized():
+    return (
+        jsonify(adb_core.result(False, "", "未授权：请在请求头携带 MCP 访问令牌。", -1)),
+        int("401"),
+    )
+
+
+def _check_access():
+    """MCP 传输入口的开关与鉴权检查；返回响应表示拒绝，None 表示放行。"""
+    if not app_config.mcp_enabled():
+        return _disabled_response()
+    if not _authorized():
+        return _unauthorized_response()
+    return None
+
+
+def _check_access_with_session(session_id: str):
+    """旧版 SSE 的 POST /messages：允许携带令牌，或使用已建立的会话 id。"""
+    if not app_config.mcp_enabled():
+        return _disabled_response()
+    if _authorized():
+        return None
+    if session_id and sessions.get(session_id) is not None:
+        return None
+    return _unauthorized_response()
+
+
+def _check_parity_access():
+    if not app_config.mcp_enabled():
+        return _disabled_response()
+    if not _authorized():
+        return _parity_unauthorized()
+    return None
 
 
 def _accepts_sse() -> bool:
@@ -108,8 +184,9 @@ def _response_stream(body):
 
 @bp.post("/mcp")
 def mcp_http():
-    if not app_config.mcp_enabled():
-        return _disabled_response()
+    denied = _check_access()
+    if denied:
+        return denied
 
     incoming = request.get_json(silent=True)
     if incoming is None:
@@ -141,8 +218,9 @@ def mcp_http():
 @bp.get("/mcp")
 def mcp_http_info():
     """浏览器直接访问给出说明；MCP 客户端带 Accept: text/event-stream 时打开 SSE 通道。"""
-    if not app_config.mcp_enabled():
-        return _disabled_response()
+    denied = _check_access()
+    if denied:
+        return denied
 
     if not _accepts_sse():
         return jsonify(
@@ -177,8 +255,9 @@ def mcp_http_info():
 
 @bp.delete("/mcp")
 def mcp_delete():
-    if not app_config.mcp_enabled():
-        return _disabled_response()
+    denied = _check_access()
+    if denied:
+        return denied
     sessions.remove((request.headers.get("Mcp-Session-Id") or "").strip())
     return Response("", status=int("204"))
 
@@ -190,8 +269,9 @@ def mcp_delete():
 
 @bp.get("/sse")
 def mcp_sse():
-    if not app_config.mcp_enabled():
-        return _disabled_response()
+    denied = _check_access()
+    if denied:
+        return denied
 
     session = sessions.create(request.args.get("protocol") or "", "sse")
     endpoint = request.host_url.rstrip("/") + "/messages?session_id=" + session.id
@@ -219,14 +299,15 @@ def mcp_sse():
 
 @bp.post("/messages")
 def mcp_sse_messages():
-    if not app_config.mcp_enabled():
-        return _disabled_response()
-
     session_id = (
         request.args.get("session_id")
         or request.headers.get("Mcp-Session-Id")
         or ""
     ).strip()
+    denied = _check_access_with_session(session_id)
+    if denied:
+        return denied
+
     session = sessions.get(session_id)
     if session is None:
         return (
@@ -266,8 +347,9 @@ def mcp_sse_messages():
 @api_route
 def api_mcp_tools():
     """与 MCP tools/list 等价的 HTTP 清单。"""
-    if not app_config.mcp_enabled():
-        return _disabled_response()
+    denied = _check_parity_access()
+    if denied:
+        return denied
     tools = mcp_tools.manifest()
     return jsonify(adb_core.result(True, "", "", 0, tools=tools, count=len(tools)))
 
@@ -276,8 +358,9 @@ def api_mcp_tools():
 @api_route
 def api_mcp_tool():
     """与 MCP tools/call 等价的 HTTP 调用。"""
-    if not app_config.mcp_enabled():
-        return _disabled_response()
+    denied = _check_parity_access()
+    if denied:
+        return denied
     data = payload()
     name = data.get("name") or data.get("tool")
     arguments = data.get("arguments")

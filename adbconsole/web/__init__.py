@@ -19,6 +19,7 @@ from flask import Flask, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import adb_core
+import adbconsole.config as app_config
 from adb_core import BASE_DIR, result
 
 from .routes import BLUEPRINTS
@@ -68,6 +69,10 @@ def create_app() -> Flask:
     app.config["TEMPLATES_AUTO_RELOAD"] = True
 
     setup_logging(app)
+
+    # 已有配置开启了 MCP 但没有令牌时，自动补一个，避免无鉴权暴露。
+    if app_config.mcp_enabled():
+        app_config.ensure_mcp_token()
 
     log_streamer = adb_core.LogcatStreamer()
     app.extensions["log_streamer"] = log_streamer

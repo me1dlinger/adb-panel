@@ -88,6 +88,37 @@ def api_mcp_status():
             tool_count=len(tools),
             tools=[tool["name"] for tool in tools],
             warning=MCP_WARNING,
+            auth_token=app_config.mcp_auth_token(),
+            auth_header=app_config.mcp_auth_header(),
+            auth_required=bool(app_config.mcp_auth_token()),
+            auth_example=app_config.mcp_auth_example(),
+        )
+    )
+
+
+@bp.post("/api/mcp/auth")
+@api_route
+def api_mcp_auth():
+    """更新 MCP 请求头名称或重新生成访问令牌。"""
+    data = payload()
+    header = data.get("header")
+    if header is not None:
+        app_config.set_mcp_auth_header(header)
+    if data.get("regenerate"):
+        app_config.rotate_mcp_token()
+    elif data.get("generate"):
+        app_config.ensure_mcp_token()
+    token = app_config.mcp_auth_token()
+    return jsonify(
+        adb_core.result(
+            True,
+            "MCP 鉴权设置已更新。",
+            "",
+            0,
+            auth_token=token,
+            auth_header=app_config.mcp_auth_header(),
+            auth_required=bool(token),
+            auth_example=app_config.mcp_auth_example(),
         )
     )
 
@@ -102,8 +133,11 @@ def api_mcp_toggle():
     requested = bool(requested)
     if requested and not data.get("acknowledge_risk"):
         raise adb_core.ApiError("启用 MCP 需要先确认风险提示。")
+    if requested:
+        app_config.ensure_mcp_token()
     enabled = app_config.set_mcp_enabled(requested)
     current_app.logger.info("MCP 服务已%s", "启用" if enabled else "关闭")
+    token = app_config.mcp_auth_token()
     return jsonify(
         adb_core.result(
             True,
@@ -112,6 +146,10 @@ def api_mcp_toggle():
             0,
             enabled=enabled,
             endpoint="/mcp",
+            auth_token=token,
+            auth_header=app_config.mcp_auth_header(),
+            auth_required=bool(token),
+            auth_example=app_config.mcp_auth_example(),
         )
     )
 

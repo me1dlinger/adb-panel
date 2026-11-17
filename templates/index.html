@@ -423,6 +423,30 @@
           <button id="btn-copy-mcp" class="btn btn-link" type="button">复制</button>
         </div>
         <p id="mcp-transports" class="hint">传输：Streamable HTTP（JSON / SSE） · HTTP+SSE · stdio</p>
+        <div class="auth-box">
+          <div class="auth-head">
+            <div>
+              <h4>请求头鉴权</h4>
+              <p class="hint">MCP 客户端需在请求头携带令牌，否则返回 401。可把下方 JSON 填到客户端的“自定义请求头”。</p>
+            </div>
+            <button id="btn-mcp-regenerate" class="btn btn-secondary btn-sm" type="button">重新生成令牌</button>
+          </div>
+          <div class="field-row">
+            <div class="field grow">
+              <label for="mcp-auth-header">请求头名称</label>
+              <input id="mcp-auth-header" class="mono-input" value="Authorization" placeholder="Authorization" autocomplete="off" spellcheck="false">
+            </div>
+            <button id="btn-mcp-save-header" class="btn btn-secondary" type="button">保存头名称</button>
+          </div>
+          <div class="field">
+            <label for="mcp-auth-token">访问令牌</label>
+            <input id="mcp-auth-token" class="mono-input" readonly placeholder="开启 MCP 时自动生成">
+          </div>
+          <pre id="mcp-auth-example" class="auth-example" aria-label="请求头 JSON"></pre>
+          <div class="field-row">
+            <button id="btn-copy-mcp-auth" class="btn btn-secondary btn-sm" type="button">复制请求头 JSON</button>
+          </div>
+        </div>
         <div class="warning-box">
           <strong>风险提示</strong>
           <p id="mcp-warning">启用后，任何能访问本机 MCP 地址的程序或 AI 客户端都可以读取设备状态、执行 shell 命令、安装或卸载应用、重启设备。请只在你信任的客户端上开启，用完及时关闭。</p>

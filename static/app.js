@@ -54,7 +54,11 @@
       endpoint: "/mcp",
       tool_count: 0,
       warning: "",
-      transports: []
+      transports: [],
+      auth: {
+        token: "",
+        header: "Authorization"
+      }
     },
     dragDepth: 0
   };
@@ -1197,6 +1201,10 @@
     state.mcp.tool_count = res.tool_count || 0;
     state.mcp.warning = res.warning || "";
     state.mcp.transports = Array.isArray(res.transports) ? res.transports : [];
+    state.mcp.auth = {
+      token: res.auth_token || "",
+      header: res.auth_header || "Authorization"
+    };
     renderMcp();
   }
 
@@ -1222,6 +1230,15 @@
       : ["streamable-http", "http-sse", "stdio"];
     $("#mcp-transports").textContent =
       "传输：" + transports.map(function (name) { return transportNames[name] || name; }).join(" · ");
+
+    var auth = state.mcp.auth || { token: "", header: "Authorization" };
+    $("#mcp-auth-header").value = auth.header;
+    var tokenInput = $("#mcp-auth-token");
+    tokenInput.value = auth.token;
+    tokenInput.placeholder = enabled || auth.token ? "已生成" : "开启 MCP 时自动生成";
+    var example = {};
+    example[auth.header] = "Bearer " + (auth.token || "<token>");
+    $("#mcp-auth-example").textContent = JSON.stringify(example, null, 2);
     if (state.mcp.warning) $("#mcp-warning").textContent = state.mcp.warning;
     $("#meta-mcp").textContent = enabled ? "已启用（" + state.mcp.tool_count + " 个工具）" : "未开启";
   }
@@ -1240,6 +1257,47 @@
       toast(enabled ? "MCP 服务已启用" : "MCP 服务已关闭", enabled ? "warn" : "success");
     }
     await loadMcpStatus();
+  }
+
+  async function regenerateMcpToken() {
+    await runWith($("#btn-mcp-regenerate"), "生成中…", async function () {
+      var res = await request("/api/mcp/auth", {
+        method: "POST",
+        body: { regenerate: true }
+      });
+      if (!res.ok) {
+        showResult($("#mcp-output"), res, { title: "MCP 鉴权" });
+        toast(res.stderr || "生成令牌失败", "error");
+        return;
+      }
+      $("#mcp-output").hidden = true;
+      $("#mcp-output").textContent = "";
+      toast("已生成新的 MCP 访问令牌，旧令牌立即失效", "warn");
+      await loadMcpStatus();
+    });
+  }
+
+  async function saveMcpAuthHeader() {
+    var header = $("#mcp-auth-header").value.trim();
+    if (!header) {
+      toast("请填写请求头名称，例如 Authorization", "error");
+      return;
+    }
+    await runWith($("#btn-mcp-save-header"), "保存中…", async function () {
+      var res = await request("/api/mcp/auth", {
+        method: "POST",
+        body: { header: header }
+      });
+      if (!res.ok) {
+        showResult($("#mcp-output"), res, { title: "MCP 鉴权" });
+        toast(res.stderr || "保存请求头失败", "error");
+        return;
+      }
+      $("#mcp-output").hidden = true;
+      $("#mcp-output").textContent = "";
+      toast("请求头名称已更新", "success");
+      await loadMcpStatus();
+    });
   }
 
   async function onMcpToggleChange(event) {
@@ -2047,6 +2105,12 @@
     $("#btn-copy-mcp").addEventListener("click", async function () {
       await copyText(window.location.origin + state.mcp.endpoint);
       toast("MCP 地址已复制", "success");
+    });
+    $("#btn-mcp-regenerate").addEventListener("click", regenerateMcpToken);
+    $("#btn-mcp-save-header").addEventListener("click", saveMcpAuthHeader);
+    $("#btn-copy-mcp-auth").addEventListener("click", async function () {
+      await copyText($("#mcp-auth-example").textContent || "{}");
+      toast("请求头 JSON 已复制", "success");
     });
 
     $("#btn-log-start").addEventListener("click", startLog);

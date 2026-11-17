@@ -26,6 +26,8 @@ ADB Console 把本机 adb 能力以 23 个工具的形式暴露给 MCP 客户端
 
 ## 客户端配置
 
+开启 MCP 后，设置页会显示访问令牌和请求头 JSON。请把它填入客户端的自定义请求头（不同客户端可能叫 `headers` / `requestHeaders` /“请求头”）。
+
 Streamable HTTP（推荐）：
 
 ```json
@@ -33,6 +35,9 @@ Streamable HTTP（推荐）：
   "mcpServers": {
     "adb-console": {
       "url": "http://127.0.0.1:5010/mcp",
+      "headers": {
+        "Authorization": "Bearer <设置页显示的令牌>"
+      },
       "timeoutMs": 60000
     }
   }
@@ -46,17 +51,31 @@ Streamable HTTP（推荐）：
   "mcpServers": {
     "adb-console": {
       "url": "http://127.0.0.1:5010/sse",
+      "headers": {
+        "Authorization": "Bearer <设置页显示的令牌>"
+      },
       "timeoutMs": 60000
     }
   }
 }
 ```
 
+## 鉴权
+
+- 首次开启 MCP 时自动生成访问令牌，保存在本机 `config.json`。
+- 默认请求头：`Authorization: Bearer <token>`；头名称可在“设置 → MCP 服务 → 请求头鉴权”中修改。
+- 兼容三种写法：裸 token、`Bearer <token>`、`Token <token>`；同时接受 `X-MCP-Token` 作为回退头。
+- 未携带或令牌错误的 MCP 请求返回 HTTP 401（JSON-RPC 错误码 `-32001`）。
+- 旧版 SSE：`GET /sse` 必须携带令牌；`POST /messages` 可携带令牌，或使用已通过鉴权建立的 `session_id`。
+- 点击“重新生成令牌”后旧令牌立即失效，需要同步更新客户端配置。
+- `/api/mcp/tools`、`/api/mcp/tool` 同样需要令牌。
+
 SSE 响应示例：
 
 ```bash
 curl -N -X POST http://127.0.0.1:5010/mcp \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
   -H "Accept: text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}}'
 # event: message

@@ -88,9 +88,18 @@ MCP 已合并进主程序，不再需要单独启动 `mcp_server.py`：
   - **stdio**：仅兼容入口 `mcp_server.py`
 - 协议：JSON-RPC 2.0；支持 `initialize`、`notifications/initialized`、`ping`、`logging/setLevel`、`tools/list`、`tools/call`
 - 开关：页面“设置 → MCP 服务”，默认关闭；关闭时所有 MCP 入口返回 403
+- 鉴权：开启 MCP 时自动生成访问令牌，客户端必须携带请求头（默认 `Authorization: Bearer <token>`）才能调用；头名称可在设置中修改，令牌可重新生成，未授权请求返回 401
 - 23 个工具：`adb_status`、`adb_devices`、`adb_connect`、`adb_pair`、`adb_shell`、`adb_install`、`adb_screenshot`、`adb_logcat`、`adb_tap`、`adb_swipe`、`adb_reboot` 等，详见 [docs/MCP.md](docs/MCP.md)。
 
 SSE 示例：`POST /mcp` 携带 `Accept: text/event-stream` 即可获得 `text/event-stream` 响应；旧版客户端连接 `/sse` 即可。`/mcp` 的 `GET` 在带 SSE Accept 时保持 keepalive 通道，否则返回传输能力说明 JSON。
+
+鉴权示例（客户端自定义请求头）：
+
+```json
+{
+  "Authorization": "Bearer <设置页显示的令牌>"
+}
+```
 
 兼容入口：仅给只能以 stdio 启动的客户端保留 `mcp_server.py`（内部复用同一网关），它不是默认启动方式。
 
