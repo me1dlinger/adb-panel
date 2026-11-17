@@ -790,6 +790,9 @@ input[type="file"]::file-selector-button {
   border-radius: 6px;
   cursor: crosshair;
   background: #f2f2f7;
+  /* 屏幕画面只用于触控操作，禁止浏览器原生图片拖拽 */
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .screen-placeholder {

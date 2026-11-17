@@ -1748,6 +1748,11 @@
     return Array.prototype.indexOf.call(types, "Files") >= 0;
   }
 
+  function isScreenEvent(event) {
+    var target = event.target;
+    return !!(target && target.closest && target.closest("#screen-card"));
+  }
+
   function showDropOverlay(show) {
     var overlay = $("#drop-overlay");
     if (overlay) overlay.hidden = !show;
@@ -1810,6 +1815,7 @@
     var overlay = $("#drop-overlay");
 
     window.addEventListener("dragenter", function (event) {
+      if (isScreenEvent(event)) return;
       if (!isFileDrag(event)) return;
       event.preventDefault();
       state.dragDepth += 1;
@@ -1817,6 +1823,7 @@
     });
 
     window.addEventListener("dragover", function (event) {
+      if (isScreenEvent(event)) return;
       if (!isFileDrag(event)) return;
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
@@ -1824,6 +1831,7 @@
     });
 
     window.addEventListener("dragleave", function (event) {
+      if (isScreenEvent(event)) return;
       state.dragDepth = Math.max(0, state.dragDepth - 1);
       if (state.dragDepth === 0 || event.relatedTarget === null) {
         showDropOverlay(false);
@@ -1831,12 +1839,28 @@
     });
 
     window.addEventListener("drop", function (event) {
+      if (isScreenEvent(event)) return;
       if (!isFileDrag(event)) return;
       event.preventDefault();
       state.dragDepth = 0;
       showDropOverlay(false);
       handleDroppedFiles(event.dataTransfer && event.dataTransfer.files);
     });
+
+    // 实时屏幕只用于触控操作：屏蔽图片原生拖拽与文件拖放上传。
+    var screenStage = $("#screen-stage");
+    if (screenStage) {
+      ["dragstart", "dragenter", "dragover", "drop"].forEach(function (type) {
+        screenStage.addEventListener(type, function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (type === "dragstart" || type === "drop") {
+            state.dragDepth = 0;
+            showDropOverlay(false);
+          }
+        });
+      });
+    }
 
     var zone = $("#drop-zone");
     if (zone) {
