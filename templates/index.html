@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ADB 控制台</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <div class="brand-text">
+          <h1>ADB 控制台</h1>
+          <p>本地 Android 设备工作台</p>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <button id="mcp-pill" class="pill pill-quiet" type="button" title="MCP 服务状态，点击打开设置">MCP 关</button>
+        <button id="btn-settings" class="btn btn-ghost btn-sm" type="button">设置</button>
+        <span id="status-pill" class="pill"><span class="dot"></span><span id="status-text">检查中</span></span>
+      </div>
+    </header>
+
+    <div class="shell">
+      <aside class="sidebar">
+        <section class="card device-card">
+          <div class="card-head">
+            <h2>设备</h2>
+            <div class="inline">
+              <button id="btn-refresh-device" class="btn btn-secondary btn-sm" type="button">刷新</button>
+              <button id="btn-disconnect" class="btn btn-secondary btn-sm" type="button">断开</button>
+            </div>
+          </div>
+          <div class="device-hero">
+            <div class="device-model" id="dev-model">未连接</div>
+            <div class="device-serial mono" id="dev-serial">—</div>
+            <div class="device-tags">
+              <span id="dev-state" class="tag">—</span>
+              <span id="dev-transport" class="tag tag-quiet">—</span>
+            </div>
+          </div>
+          <div id="dev-picker-wrap" class="field" hidden>
+            <label for="dev-picker">切换设备</label>
+            <select id="dev-picker"></select>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>无线连接</h2></div>
+          <div class="field">
+            <label for="ip">IP 地址</label>
+            <input id="ip" class="mono-input" placeholder="例如 192.168.1.100" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="field-row">
+            <div class="field grow">
+              <label for="port">无线调试端口</label>
+              <input id="port" class="mono-input" placeholder="手机无线调试界面显示的端口" inputmode="numeric" autocomplete="off">
+            </div>
+            <button id="btn-connect" class="btn btn-primary" type="button">连接</button>
+          </div>
+          <details class="pair-box">
+            <summary>使用配对码配对</summary>
+            <div class="pair-fields">
+              <div class="field">
+                <label for="pair-port">配对端口</label>
+                <input id="pair-port" class="mono-input" placeholder="配对端口" inputmode="numeric" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="pair-code">配对码</label>
+                <input id="pair-code" class="mono-input" placeholder="6 位数字" inputmode="numeric" maxlength="6" autocomplete="off">
+              </div>
+            </div>
+            <button id="btn-pair" class="btn btn-secondary btn-block" type="button">配对</button>
+            <p class="hint">配对端口与无线调试端口不同，来自手机“使用配对码配对设备”弹窗。配对成功后再用上方端口连接。</p>
+          </details>
+          <div id="connect-output" class="output" hidden></div>
+        </section>
+
+        <section class="card discovery-card">
+          <div class="card-head">
+            <h2>自动发现</h2>
+            <button id="btn-scan" class="btn btn-secondary btn-sm" type="button">立即扫描</button>
+          </div>
+          <div class="discovery-meta">
+            <span id="discovery-time" class="muted">尚未扫描</span>
+          </div>
+          <ul id="discovery-list" class="discovery-list">
+            <li class="empty">正在等待扫描结果。</li>
+          </ul>
+          <div id="discovery-error" class="error-line" hidden></div>
+        </section>
+      </aside>
+
+      <main class="content">
+        <nav class="tabs" role="tablist" aria-label="功能分区">
+          <button class="tab is-active" type="button" data-tab="overview" role="tab">概览</button>
+          <button class="tab" type="button" data-tab="screen" role="tab">屏幕与触控</button>
+          <button class="tab" type="button" data-tab="apps" role="tab">应用与进程</button>
+          <button class="tab" type="button" data-tab="logs" role="tab">日志</button>
+          <button class="tab" type="button" data-tab="files" role="tab">文件</button>
+          <button class="tab" type="button" data-tab="shell" role="tab">命令</button>
+        </nav>
+
+        <section class="tab-panel" id="panel-overview">
+          <section class="card">
+            <div class="card-head">
+              <h2>实时状态</h2>
+              <div class="inline">
+                <span id="info-time" class="muted">—</span>
+                <button id="btn-info-pause" class="btn btn-secondary btn-sm" type="button">暂停刷新</button>
+              </div>
+            </div>
+            <div class="stat-grid">
+              <div class="stat"><span class="stat-label">电量</span><span id="st-battery" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">存储</span><span id="st-storage" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">内存</span><span id="st-memory" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">网络</span><span id="st-network" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">屏幕</span><span id="st-screen" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">运行时间</span><span id="st-uptime" class="stat-value">—</span></div>
+              <div class="stat stat-wide"><span class="stat-label">前台应用</span><span id="st-focus" class="stat-value mono">—</span></div>
+              <div class="stat stat-wide"><span class="stat-label">系统版本</span><span id="st-system" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">型号</span><span id="st-model" class="stat-value">—</span></div>
+              <div class="stat"><span class="stat-label">序列号</span><span id="st-serial" class="stat-value mono">—</span></div>
+            </div>
+            <p class="hint">每 2 秒自动读取一次；无设备或未授权时显示 adb 的真实错误。</p>
+            <div id="info-output" class="output" hidden></div>
+          </section>
+
+          <div class="two-col">
+            <section class="card">
+              <div class="card-head"><h2>设备操作</h2></div>
+              <div class="action-row">
+                <button id="btn-shot" class="btn btn-secondary" type="button">截图保存</button>
+                <button id="btn-open-screen" class="btn btn-secondary" type="button">打开屏幕</button>
+              </div>
+              <hr class="divider">
+              <h3>重启</h3>
+              <div class="btn-row">
+                <button class="btn btn-secondary" type="button" data-reboot="system">系统</button>
+                <button class="btn btn-secondary" type="button" data-reboot="recovery">恢复模式</button>
+                <button class="btn btn-secondary" type="button" data-reboot="bootloader">引导模式</button>
+              </div>
+              <p class="hint">重启会断开 adb 连接，设备恢复后需要重新连接。</p>
+              <div id="reboot-output" class="output" hidden></div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><h2>本机信息</h2></div>
+              <dl class="kv">
+                <div><dt>ADB</dt><dd id="meta-adb" class="mono">—</dd></div>
+                <div><dt>数据目录</dt><dd id="meta-dir" class="mono">—</dd></div>
+                <div><dt>版本</dt><dd id="meta-version">—</dd></div>
+                <div><dt>MCP</dt><dd id="meta-mcp">未开启</dd></div>
+              </dl>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-screen" hidden>
+          <div class="screen-layout">
+            <section class="card screen-card" id="screen-card">
+              <div class="card-head screen-drag-handle">
+                <h2>实时屏幕</h2>
+                <div class="inline">
+                  <button id="btn-screen-float" class="btn btn-secondary btn-sm" type="button" disabled title="连接设备后可浮动显示">浮动</button>
+                  <button id="btn-screen-start" class="btn btn-primary btn-sm" type="button">开始</button>
+                  <button id="btn-screen-stop" class="btn btn-secondary btn-sm" type="button" disabled>停止</button>
+                  <button id="btn-screen-full" class="btn btn-secondary btn-sm" type="button">全屏</button>
+                  <button id="btn-screen-save" class="btn btn-secondary btn-sm" type="button">截图</button>
+                </div>
+              </div>
+              <div class="screen-meta">
+                <span id="screen-state" class="screen-state">未运行</span>
+                <span>帧率 <strong id="screen-fps">—</strong></span>
+                <span>延迟 <strong id="screen-latency">—</strong></span>
+                <span>分辨率 <strong id="screen-res">—</strong></span>
+                <span id="screen-serial" class="mono soft"></span>
+              </div>
+              <div class="screen-stage" id="screen-stage">
+                <img id="screen-img" alt="设备实时画面" hidden>
+                <div id="screen-placeholder" class="screen-placeholder">
+                  <p>点击“开始”后显示设备画面。</p>
+                  <p class="hint">实时流由后台持续取帧。点击画面会向设备发送轻触。</p>
+                </div>
+                <span id="screen-tap-dot" class="tap-dot" hidden></span>
+              </div>
+              <div id="screen-output" class="output" hidden></div>
+            </section>
+
+            <section class="card control-card">
+              <div class="card-head"><h2>触控与按键</h2></div>
+              <h3>按键</h3>
+              <div class="key-grid">
+                <button class="btn btn-secondary" type="button" data-key="back">返回</button>
+                <button class="btn btn-secondary" type="button" data-key="home">主页</button>
+                <button class="btn btn-secondary" type="button" data-key="recent">最近任务</button>
+                <button class="btn btn-secondary" type="button" data-key="power">电源</button>
+                <button class="btn btn-secondary" type="button" data-key="volume_up">音量 +</button>
+                <button class="btn btn-secondary" type="button" data-key="volume_down">音量 -</button>
+              </div>
+              <hr class="divider">
+              <h3>轻触</h3>
+              <div class="field-row">
+                <div class="field field-num"><label for="tap-x">X</label><input id="tap-x" type="number" min="0" value="540"></div>
+                <div class="field field-num"><label for="tap-y">Y</label><input id="tap-y" type="number" min="0" value="1200"></div>
+                <button id="btn-tap" class="btn btn-secondary" type="button">发送轻触</button>
+              </div>
+              <h3>滑动</h3>
+              <div class="grid-4">
+                <div class="field field-num"><label for="sw-x1">起点 X</label><input id="sw-x1" type="number" min="0" value="540"></div>
+                <div class="field field-num"><label for="sw-y1">起点 Y</label><input id="sw-y1" type="number" min="0" value="1800"></div>
+                <div class="field field-num"><label for="sw-x2">终点 X</label><input id="sw-x2" type="number" min="0" value="540"></div>
+                <div class="field field-num"><label for="sw-y2">终点 Y</label><input id="sw-y2" type="number" min="0" value="600"></div>
+              </div>
+              <div class="field-row">
+                <div class="field field-num"><label for="sw-duration">时长 (ms)</label><input id="sw-duration" type="number" min="50" max="10000" value="300"></div>
+                <button id="btn-swipe" class="btn btn-secondary" type="button">发送滑动</button>
+              </div>
+              <p class="hint">坐标基于设备分辨率；点击实时屏幕画面也可发送轻触。</p>
+              <div id="touch-output" class="output" hidden></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-apps" hidden>
+          <div class="two-col">
+            <section class="card">
+              <div class="card-head">
+                <h2>应用</h2>
+                <div class="inline">
+                  <label class="check"><input type="checkbox" id="pkg-third"> 仅第三方</label>
+                  <button id="btn-packages" class="btn btn-secondary btn-sm" type="button">加载列表</button>
+                </div>
+              </div>
+              <div class="toolbar">
+                <input id="pkg-filter" class="grow" placeholder="筛选包名" autocomplete="off">
+                <span id="pkg-count" class="muted">0 个</span>
+              </div>
+              <div id="pkg-output" class="output" hidden></div>
+              <ul id="pkg-list" class="pkg-list">
+                <li class="empty">加载后可启动、停止、清除数据或卸载应用。</li>
+              </ul>
+            </section>
+
+            <section class="card">
+              <div class="card-head">
+                <h2>进程</h2>
+                <button id="btn-processes" class="btn btn-secondary btn-sm" type="button">刷新进程</button>
+              </div>
+              <div class="toolbar">
+                <input id="process-filter" class="grow" placeholder="搜索进程" autocomplete="off">
+                <span id="process-count" class="muted">0 个</span>
+              </div>
+              <div id="process-output" class="output" hidden></div>
+              <div class="process-list">
+                <div class="process-head"><span>PID</span><span>名称</span><span>内存</span></div>
+                <div id="process-list" class="process-rows scroll-list">
+                  <p class="empty">尚未读取进程。</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="card">
+            <div class="card-head"><h2>安装 APK</h2></div>
+            <div class="field">
+              <label for="install-path">本机 APK 路径</label>
+              <input id="install-path" class="mono-input" placeholder="例如 E:\apk\app-debug.apk" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="field-row">
+              <input type="file" id="install-file" accept=".apk">
+              <button id="btn-install" class="btn btn-primary" type="button">安装</button>
+            </div>
+            <p class="hint">可直接填写本机任意位置的 .apk 路径，或选择文件上传后安装。安装使用 adb install -r。</p>
+            <div id="install-output" class="output" hidden></div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="panel-logs" hidden>
+          <section class="card log-card">
+            <div class="card-head">
+              <h2>日志</h2>
+              <div class="inline">
+                <button id="btn-log-start" class="btn btn-primary btn-sm" type="button">开始</button>
+                <button id="btn-log-stop" class="btn btn-secondary btn-sm" type="button" disabled>停止</button>
+                <button id="btn-log-pause" class="btn btn-secondary btn-sm" type="button">暂停显示</button>
+                <button id="btn-log-clear" class="btn btn-secondary btn-sm" type="button">清空</button>
+              </div>
+            </div>
+            <div class="log-toolbar">
+              <input id="log-filter" class="grow" placeholder="过滤关键字" autocomplete="off">
+              <select id="log-level" class="select-sm" aria-label="日志级别">
+                <option value="V">全部级别</option>
+                <option value="D">调试及以上</option>
+                <option value="I">信息及以上</option>
+                <option value="W">警告及以上</option>
+                <option value="E">错误</option>
+              </select>
+              <label class="check"><input type="checkbox" id="log-autoscroll" checked> 自动滚动</label>
+              <span id="log-state" class="muted">未运行</span>
+              <span id="log-count" class="muted">0 行</span>
+            </div>
+            <div id="log-error" class="error-line" hidden></div>
+            <pre id="log-view" class="log-view" aria-label="日志输出">尚未开始日志流。</pre>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="panel-files" hidden>
+          <div class="two-col">
+            <section class="card">
+              <div class="card-head">
+                <h2>发送到设备</h2>
+                <span class="muted">推送 / 安装</span>
+              </div>
+              <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="拖拽或点击选择文件">
+                <span class="drop-zone-icon">＋</span>
+                <strong>拖拽文件到这里</strong>
+                <span class="muted">或点击选择文件。APK 可选择安装或仅推送。</span>
+                <input type="file" id="push-file" hidden>
+              </div>
+              <div class="field">
+                <label for="push-local">本机路径（可选，优先级低于所选文件）</label>
+                <input id="push-local" class="mono-input" placeholder="uploads\example.txt" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="field">
+                <label for="push-remote">设备目录</label>
+                <input id="push-remote" class="mono-input" value="/sdcard/Download/" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="field-row">
+                <button id="btn-push" class="btn btn-primary" type="button">推送到设备</button>
+              </div>
+              <div id="push-output" class="output" hidden></div>
+            </section>
+
+            <section class="card">
+              <div class="card-head">
+                <h2>从设备拉取</h2>
+                <button id="btn-pull-refresh" class="btn btn-link" type="button">刷新列表</button>
+              </div>
+              <div class="field-row">
+                <div class="field grow">
+                  <label for="pull-remote">设备文件路径</label>
+                  <input id="pull-remote" class="mono-input" placeholder="/sdcard/Download/file.jpg" autocomplete="off" spellcheck="false">
+                </div>
+                <button id="btn-pull" class="btn btn-secondary" type="button">拉取</button>
+              </div>
+              <p class="hint">文件保存到 pulls/ 目录，可在下方下载。</p>
+              <div id="pull-output" class="output" hidden></div>
+              <div class="list-head"><span>已拉取文件</span></div>
+              <ul id="pull-list" class="file-list">
+                <li class="empty">暂无文件。</li>
+              </ul>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-shell" hidden>
+          <section class="card">
+            <div class="card-head"><h2>命令行</h2></div>
+            <div class="field-row">
+              <input id="shell-cmd" class="grow mono-input" placeholder="输入设备命令，例如 pm list packages" autocomplete="off" spellcheck="false">
+              <button id="btn-shell" class="btn btn-primary" type="button">运行</button>
+            </div>
+            <div id="shell-history" class="chips" hidden></div>
+            <div id="shell-output" class="output" hidden></div>
+          </section>
+        </section>
+
+        <footer class="foot">
+          <span>ADB 路径：<span class="mono" id="adb-path">—</span></span>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <div id="drop-overlay" class="drop-overlay" hidden>
+    <div class="drop-overlay-card">
+      <span class="drop-overlay-icon">↓</span>
+      <h2>松开以发送到设备</h2>
+      <p>APK 可选择“安装”或“仅推送”；其它文件会询问是否推送到手机目录。</p>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h3 id="settings-title">设置</h3>
+        <button id="settings-close" class="btn-icon" type="button" aria-label="关闭">×</button>
+      </div>
+
+      <section class="settings-section">
+        <h4>ADB 可执行文件</h4>
+        <p class="hint">用于连接设备与执行命令。可手动填写，或点击“浏览”选择 adb.exe。</p>
+        <div class="field-row">
+          <input id="adb-path-input" class="mono-input grow" placeholder="例如 E:\android-sdk\platform-tools\adb.exe" autocomplete="off" spellcheck="false">
+          <button id="btn-browse-adb" class="btn btn-secondary" type="button">浏览…</button>
+        </div>
+        <div class="field-row">
+          <button id="btn-adb-test" class="btn btn-secondary" type="button">测试</button>
+          <button id="btn-adb-save" class="btn btn-primary" type="button">保存</button>
+        </div>
+        <div id="adb-output" class="output" hidden></div>
+      </section>
+
+      <hr class="divider">
+
+      <section class="settings-section">
+        <div class="mcp-head">
+          <div>
+            <h4>MCP 服务（AI 客户端接入）</h4>
+            <p class="hint">与主程序同进程运行，无需单独启动；默认关闭。</p>
+          </div>
+          <label class="switch" title="启用 / 关闭 MCP">
+            <input type="checkbox" id="mcp-toggle">
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <div class="mcp-state-row">
+          <span id="mcp-state" class="tag">已关闭</span>
+          <code id="mcp-endpoint" class="mono">—</code>
+          <button id="btn-copy-mcp" class="btn btn-link" type="button">复制</button>
+        </div>
+        <div class="warning-box">
+          <strong>风险提示</strong>
+          <p id="mcp-warning">启用后，任何能访问本机 MCP 地址的程序或 AI 客户端都可以读取设备状态、执行 shell 命令、安装或卸载应用、重启设备。请只在你信任的客户端上开启，用完及时关闭。</p>
+        </div>
+        <div id="mcp-output" class="output" hidden></div>
+      </section>
+
+      <div class="modal-actions">
+        <button id="settings-done" class="btn btn-secondary" type="button">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title">确认操作</h3>
+      <p id="modal-text"></p>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn btn-secondary" type="button">取消</button>
+        <button id="modal-confirm" class="btn btn-danger" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="choice-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="choice-title">
+      <h3 id="choice-title">选择操作</h3>
+      <p id="choice-text"></p>
+      <div id="choice-options" class="choice-options"></div>
+      <div class="modal-actions">
+        <button id="choice-cancel" class="btn btn-secondary" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# 运行时数据与本地环境，不入库
+__pycache__/
+*.pyc
+.codefree/
+
+# 本机配置与设备记录（含个人 adb 路径 / IP）
+config.json
+known_devices.json
+
+# 运行时目录
+logs/
+screenshots/
+pulls/
+uploads/
+
+# 打包产物
+build/
+dist/
+*.spec
